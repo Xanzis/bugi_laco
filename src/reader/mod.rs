@@ -1,11 +1,14 @@
-mod bounds;
+mod handle;
 
-use std::collections::{HashMap, HashSet};
-use crate::spatial::Point;
-use bounds::{Segment, ClosedBound};
+use handle::{EdgeHandle, PointStore};
+
+use std::collections::{HashMap, BTreeSet};
+use spacemath::two::boundary::Boundary;
+use spacemath::two::Point;
 
 pub struct PartModel {
-	points: PointStore,
+	outer_bound: Boundary,
+	inner_bounds: Vec<Boundary>,
 }
 
 impl PartModel {
@@ -13,99 +16,64 @@ impl PartModel {
 		let input = dxf::Drawing::load_file("example_files/test.DXF").unwrap();
 
 		let mut store = PointStore::new();
-		let mut segments = Vec::new();
+		let mut edges = Vec::new();
 
-		// construct segment list
-		for ent in input.entities() {
-			println!("{:#?}\n", ent);
-
-			if let Some(seg) = Segment::maybe_from_entity(ent, &mut store) {
-				segments.push(seg)
-			}
+		// construct edge list
+		for ent in input.entities().cloned() {
+			edges.extend(EdgeHandle::from_entity(&mut store, ent))
 		}
 
-		println!("{:#?}", segments);
+		println!("{:#?}", edges);
 
 		// group segments into boundaries
-		let mut bounds: Vec<ClosedBound> = Vec::new()
-		let mut remaining_points: HashSet<_> = store.all_ids().cloned().collect();
+		let mut bounds: Vec<Boundary> = Vec::new();
 
-		while !remaining_points.is_empty() {
-			// select an unclaimed starting point
-			let first = remaining_points.iter().next().unwrap().clone();
-
-			let mut bound_points = vec![first];
-			let mut bound_segments = vec![];
+		while !edges.is_empty() {
+			let mut bound_edges = vec![edges.pop().unwrap()];
+			let first_id = bound_edges.first().unwrap().p_id();
 
 			// find a closed loop of segments
-			for i in 0.. {
-				let cur_a = bound_points[i];
-				
-				// find a segment, avoiding picking the previous segment if i > 0
-				let mut new_seg = if i == 0 {
-					segments.iter()
-						.filter_map(|s| s.as_starting_with(cur_a))
-						.next().expect("dangling point")
-				} else {
-					segments.iter()
-						.filter_map(|s| s.as_starting_with(cur_a))
-						.filter(|s| s.end_point() != bound_points[i-1])
-						.next().expect("dangling point")
+			loop {
+				let cur_e = bound_edges.last().unwrap();
+
+				if bound_edges.last().unwrap().q_id() == first_id {
+					break
 				}
 
-				bound_points.push(new_seg.end_id());
-				bound_segments.push(new_seg);
+				let next_pos = edges
+					.iter()
+					.position(|e| e.as_starting_with(cur_e.q_id()).is_some())
+					.expect("dangling edge");
 
-				if bound_points.last().unwrap() == bound_points[0] {
-					break;
-				}
+				bound_edges.push(edges.swap_remove(next_pos));
 			}
 
-			bound_points.iter().for_each(|p| remaining_points.remove(p));
-			bounds.push(ClosedBound::from_segments(bound_segments));
+			// loses point id information
+			bounds.push(Boundary::new(bound_edges));
 		}
 
 		// one of the bounds will enclose all bounds
 		// all others will be enclosed by that one and no others
 
-		unimplemented!("Not done lol")
-	}
-}
+		println!("{:?}", bounds);
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
-pub struct PointId(usize);
+		let mut enclosing = None;
 
-pub struct PointStore(HashMap<PointId, Point>);
+		for i in 0..bounds.len() {
+			let cur_bound = bounds.get(i).unwrap();
 
-impl PointStore {
-	fn new() -> Self {
-		Self(HashMap::new())
-	}
-
-	fn next_id(&self) -> PointId {
-		PointId(self.0.len())
-	}
-
-	fn id_or_insert(&mut self, p: Point) -> PointId {
-		// hot garbage O(n) approach
-		// necessary because arcs are defined by center / angle but
-		//   arc end points need to alias with line end points
-		// quadtrees are probably the right way to go about this
-
-		for (id, stored_p) in self.0.iter() {
-			// ad hoc tolerance
-			if stored_p.dist(p) < 1e-6 {
-				return *id
+			// check if all but the current boundary are enclosed
+			let mut all_but_cur = bounds.iter().enumerate().filter(|&(j, _)| j != i).map(|(_, v)| v);
+			if all_but_cur.all(|b| cur_bound.contains_boundary(b)) {
+				enclosing = Some(i);
 			}
 		}
 
-		let new_id = self.next_id();
-		self.0.insert(new_id, p);
+		let enclosing = bounds.swap_remove(enclosing.expect("no enclosing bounday"));
 
-		new_id
-	}
+		// TODO: handle improper models where a boundary is enclosed by more than one (nested)
+		// TODO: check that no boundaries intersect
 
-	fn all_ids(&self) -> impl Iterator<Item=&PointId> {
-		self.0.iter_keys()
+		Self { outer_bound: enclosing, inner_bounds: bounds }
 	}
 }
