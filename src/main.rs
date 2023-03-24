@@ -1,7 +1,6 @@
 use eframe::egui;
 
 mod reader;
-mod spatial;
 
 fn main() {
     // Log to stdout (if you run with `RUST_LOG=debug`).
