@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use spacemath::two::boundary::Edge;
 use spacemath::two::point::Point;
 use spacemath::two::line::{Segment, Arc};
+use spacemath::two::dist::Dist;
 
 use dxf::entities::Entity;
 
@@ -87,8 +88,26 @@ impl EdgeHandle {
 
 				Some(Self {edge, p_id, q_id})
 			},
+			dxf::entities::EntityType::Circle(c) => {
+				// a circle is a 0-2pi arc
+				let center: Point = dxf_point(&c.center);
+				let r = c.radius;
+
+				let start = 0.0;
+				let end = std::f64::consts::TAU;
+
+				let p = (Point::unit(start) * r) + center;
+				let q = (Point::unit(end) * r) + center;
+
+				let p_id = store.id_or_insert(p);
+				let q_id = store.id_or_insert(q);
+
+				let edge = Arc::from_center_ang(center, r, start, end, true).into();
+
+				Some(Self {edge, p_id, q_id})
+			},
 			x => {
-				println!("no implementation for:\n{:?}", x);
+				eprintln!("WARNING: no implementation for dxf entity:\n{:?}", x);
 				None
 			},
 		}

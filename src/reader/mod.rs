@@ -6,9 +6,10 @@ use std::collections::{HashMap, BTreeSet};
 use spacemath::two::boundary::Boundary;
 use spacemath::two::Point;
 
+#[derive(Clone, Debug)]
 pub struct PartModel {
-	outer_bound: Boundary,
-	inner_bounds: Vec<Boundary>,
+	pub (crate) outer_bound: Boundary,
+	pub (crate) inner_bounds: Vec<Boundary>,
 }
 
 impl PartModel {
@@ -22,8 +23,6 @@ impl PartModel {
 		for ent in input.entities().cloned() {
 			edges.extend(EdgeHandle::from_entity(&mut store, ent))
 		}
-
-		println!("{:#?}", edges);
 
 		// group segments into boundaries
 		let mut bounds: Vec<Boundary> = Vec::new();
@@ -54,8 +53,6 @@ impl PartModel {
 
 		// one of the bounds will enclose all bounds
 		// all others will be enclosed by that one and no others
-
-		println!("{:?}", bounds);
 
 		let mut enclosing = None;
 
