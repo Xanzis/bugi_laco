@@ -1,11 +1,11 @@
 use iced::widget::canvas::event::{self, Event};
-use iced::widget::canvas::path::Builder;
+use iced::widget::canvas::path::{Arc, Builder};
 use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke};
 use iced::Color;
 use iced::{keyboard, mouse};
 use iced::{Element, Length, Rectangle, Theme};
 
-use spacemath::two::boundary::Boundary;
+use spacemath::two::boundary::{Boundary, Edge};
 
 use super::mark::{MarkedBound, MarkedModel};
 use crate::reader::PartModel;
@@ -16,13 +16,18 @@ pub struct CanvasState {
 }
 
 impl CanvasState {
-    pub fn view<'a>(&'a self, model: Option<&'a MarkedModel>) -> Element<'a, PlotMessage> {
+    pub fn view<'a>(
+        &'a self,
+        model: Option<&'a MarkedModel>,
+        w: Length,
+        h: Length,
+    ) -> Element<PlotMessage> {
         Canvas::new(Plot {
             canvas_state: self,
             model,
         })
-        .width(Length::Fill)
-        .height(Length::Fill)
+        .width(w)
+        .height(h)
         .into()
     }
 
@@ -44,7 +49,6 @@ struct PlotState {
 #[derive(Clone, Debug)]
 pub enum PlotMessage {
     Redraw,
-    Hover(spacemath::two::Point),
     Select(spacemath::two::Point),
 }
 
@@ -63,7 +67,6 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
             .cache
             .draw(bounds.size(), |frame: &mut Frame| {
                 self.model.map(|m| draw_model(m, &state.transform, frame));
-
                 frame.stroke(
                     &Path::rectangle(iced::Point::ORIGIN, frame.size()),
                     Stroke::default().with_width(2.0),
@@ -100,19 +103,19 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
             Event::Keyboard(keyboard_event) => {
                 match keyboard_event {
                     keyboard::Event::CharacterReceived('q') => {
-                        state.transform.centered_zoom(1.25, bounds.center());
+                        state.transform.zoom(1.25, bounds.center());
                         (event::Status::Captured, Some(PlotMessage::Redraw))
                     }
                     keyboard::Event::CharacterReceived('e') => {
-                        state.transform.centered_zoom(0.75, bounds.center());
+                        state.transform.zoom(0.75, bounds.center());
                         (event::Status::Captured, Some(PlotMessage::Redraw))
                     }
                     keyboard::Event::CharacterReceived('d') => {
-                        state.transform.x_shift(0.2, bounds.center());
+                        state.transform.x_shift(-0.2, bounds.center());
                         (event::Status::Captured, Some(PlotMessage::Redraw))
                     }
                     keyboard::Event::CharacterReceived('a') => {
-                        state.transform.x_shift(-0.2, bounds.center());
+                        state.transform.x_shift(0.2, bounds.center());
                         (event::Status::Captured, Some(PlotMessage::Redraw))
                     }
                     keyboard::Event::CharacterReceived('w') => {
@@ -123,6 +126,16 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
                         state.transform.y_shift(-0.2, bounds.center());
                         (event::Status::Captured, Some(PlotMessage::Redraw))
                     }
+                    keyboard::Event::CharacterReceived('c') => {
+                        if let Some(m) = self.model {
+                            state
+                                .transform
+                                .center_model(m.bounding_box(), bounds.center());
+                            (event::Status::Captured, Some(PlotMessage::Redraw))
+                        } else {
+                            (event::Status::Captured, None)
+                        }
+                    }
                     _ => (event::Status::Ignored, None),
                 }
                 // other key entries could send messages up to the top level app
@@ -132,90 +145,146 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
     }
 }
 
-fn draw_bound(bound: &MarkedBound, transform: &Transform, frame: &mut Frame) {
-    // dead simple to start - just plot polygon that shares the vertices of bound
-    // arcs plot as lines for now
-
-    let mut blank_builder = Builder::new();
-    let mut marked_builder = Builder::new(); // replace soon with various marking types
-
-    for (edge, mark) in bound.edges_and_marks() {
-        if mark.is_empty() {
-            // replace soon with proper draw handling (separate function to stay succint)
-            blank_builder.move_to(transform.forward(edge.p()));
-            blank_builder.line_to(transform.forward(edge.q()));
-        } else {
-            marked_builder.move_to(transform.forward(edge.p()));
-            marked_builder.line_to(transform.forward(edge.q()));
-        }
-    }
-
-    let blank_path = blank_builder.build();
-    let marked_path = marked_builder.build();
-
-    let marked_stroke = Stroke::default()
-        .with_width(2.0)
-        .with_color(Color::from_rgb8(0, 150, 250));
-
-    frame.stroke(&blank_path, Stroke::default().with_width(2.0));
-    frame.stroke(&marked_path, marked_stroke);
-}
-
 fn draw_model(model: &MarkedModel, transform: &Transform, frame: &mut Frame) {
     for b in model.bounds() {
         draw_bound(b, transform, frame);
     }
 }
 
+fn draw_bound(bound: &MarkedBound, transform: &Transform, frame: &mut Frame) {
+    // dead simple to start - just plot polygon that shares the vertices of bound
+    // arcs plot as lines for now
+
+    let mut blank_builder = Builder::new();
+    let mut clicked_builder = Builder::new();
+    let mut force_builder = Builder::new();
+    let mut constraint_builder = Builder::new();
+
+    for (edge, mark) in bound.edges_and_marks() {
+        if mark.is_clicked() {
+            build_edge(&mut clicked_builder, edge, transform);
+        } else if mark.is_force() {
+            build_edge(&mut force_builder, edge, transform);
+        } else if mark.is_constraint() {
+            build_edge(&mut constraint_builder, edge, transform);
+        } else {
+            build_edge(&mut blank_builder, edge, transform);
+        }
+    }
+
+    let blank_path = blank_builder.build();
+    let clicked_path = clicked_builder.build();
+    let force_path = force_builder.build();
+    let constraint_path = constraint_builder.build();
+
+    let clicked_stroke = Stroke::default()
+        .with_width(2.0)
+        .with_color(Color::from_rgb8(0, 150, 250));
+    let force_stroke = Stroke::default()
+        .with_width(2.0)
+        .with_color(Color::from_rgb8(250, 150, 0));
+    let constraint_stroke = Stroke::default()
+        .with_width(2.0)
+        .with_color(Color::from_rgb8(0, 250, 0));
+
+    frame.stroke(&blank_path, Stroke::default().with_width(2.0));
+    frame.stroke(&clicked_path, clicked_stroke);
+    frame.stroke(&force_path, force_stroke);
+    frame.stroke(&constraint_path, constraint_stroke);
+}
+
+fn build_edge(builder: &mut Builder, edge: &Edge, transform: &Transform) {
+    match *edge {
+        Edge::Arc(a) => {
+            let arc = Arc {
+                center: transform.forward(a.center()),
+                radius: transform.apply_scale(a.radius()) as f32,
+                start_angle: (-1.0 * a.p_ang()) as f32,
+                end_angle: (-1.0 * a.q_ang()) as f32,
+            };
+            builder.arc(arc);
+        }
+        Edge::Segment(s) => {
+            builder.move_to(transform.forward(edge.p()));
+            builder.line_to(transform.forward(edge.q()));
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Transform {
-    pub scale: f64,
-    pub offset: spacemath::two::Point,
+    scale: f64,
+    screen_offset: iced::Vector<f32>,
+    model_offset: spacemath::two::Point,
 }
 
 impl Default for Transform {
     fn default() -> Self {
         Self {
             scale: 1.0,
-            offset: spacemath::two::Point::origin(),
+            screen_offset: [0.0, 0.0].into(),
+            model_offset: spacemath::two::Point::origin(),
         }
     }
 }
 
 impl Transform {
     fn forward(&self, r: spacemath::two::Point) -> iced::Point {
+        let r = r - self.model_offset;
         let r = r * self.scale;
-        let r = r + self.offset;
-        iced::Point {
+        let r = iced::Point {
             x: r.x as f32,
             y: -1.0 * r.y as f32,
-        }
+        };
+        r + self.screen_offset
     }
 
     fn reverse(&self, r: iced::Point) -> spacemath::two::Point {
+        let r = r - self.screen_offset;
         let r = spacemath::two::Point {
             x: r.x as f64,
             y: -1.0 * r.y as f64,
         };
-        let r = r - self.offset;
-        r / self.scale
+        let r = r / self.scale;
+        r + self.model_offset
     }
 
-    fn centered_zoom(&mut self, zoom: f64, center: iced::Point) {
-        // proportional zoom in a way that preserves the center location
-        let model_center = self.reverse(center);
-        let delta = (model_center * zoom) - model_center;
+    fn center_model(
+        &mut self,
+        model_bound: (spacemath::two::Point, spacemath::two::Point),
+        screen_center: iced::Point,
+    ) {
+        // get the model centered in the screen in a way that should zoom well
+        // changing model_offset after this operation shouldn't be necessary
+
+        let model_x_span = model_bound.1.x - model_bound.0.x;
+        let model_center = model_bound.0.mid(model_bound.1);
+
+        self.model_offset = model_center;
+        self.screen_offset = [screen_center.x, screen_center.y].into();
+
+        self.scale = screen_center.x as f64 / model_x_span;
+    }
+
+    fn zoom(&mut self, zoom: f64, center: iced::Point) {
+        // zoom while maintaining the current center
+        let current_center = self.reverse(center);
+
+        self.model_offset = current_center;
+        self.screen_offset = [center.x, center.y].into();
+
         self.scale *= zoom;
-        self.offset = self.offset - delta;
     }
 
-    fn x_shift(&mut self, shift: f64, center: iced::Point) {
-        let shift = ((center.x as f64) * 1.0) * shift;
-        self.offset.x = self.offset.x + shift;
+    fn apply_scale(&self, x: f64) -> f32 {
+        (x * self.scale) as f32
     }
 
-    fn y_shift(&mut self, shift: f64, center: iced::Point) {
-        let shift = ((center.y as f64) * 1.0) * shift;
-        self.offset.y = self.offset.y + shift;
+    fn x_shift(&mut self, shift: f32, center: iced::Point) {
+        self.screen_offset.x = self.screen_offset.x + (center.x * shift);
+    }
+
+    fn y_shift(&mut self, shift: f32, center: iced::Point) {
+        self.screen_offset.y = self.screen_offset.y + (center.y * shift);
     }
 }
