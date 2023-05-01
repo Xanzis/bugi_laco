@@ -44,7 +44,11 @@ impl PartModel {
                     .position(|e| e.as_starting_with(cur_e.q_id()).is_some())
                     .expect("dangling edge");
 
-                bound_edges.push(edges.swap_remove(next_pos));
+                let new_edge = edges
+                    .swap_remove(next_pos)
+                    .as_starting_with(cur_e.q_id())
+                    .unwrap();
+                bound_edges.push(new_edge);
             }
 
             // loses point id information
@@ -70,7 +74,7 @@ impl PartModel {
             }
         }
 
-        let enclosing = bounds.swap_remove(enclosing.expect("no enclosing bounday"));
+        let enclosing = bounds.swap_remove(enclosing.expect("no enclosing boundary"));
 
         // TODO: handle improper models where a boundary is enclosed by more than one (nested)
         // TODO: check that no boundaries intersect
