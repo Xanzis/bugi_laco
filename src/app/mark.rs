@@ -115,6 +115,13 @@ impl MarkedBound {
         self.bound.edges().zip(self.marks.iter())
     }
 
+    pub fn from_edges_and_marks(edges: Vec<Edge>, marks: Vec<Mark>) -> Self {
+        Self {
+            bound: Boundary::new(edges),
+            marks,
+        }
+    }
+
     pub fn pos_edge_index(&self, pos: Point) -> usize {
         self.bound
             .edges()
@@ -149,6 +156,30 @@ impl MarkedBound {
         for m in self.marks.iter_mut() {
             m.inter = Interaction::Ignored
         }
+    }
+
+    pub fn into_parts(self) -> (Boundary, Vec<Mark>) {
+        (self.bound, self.marks)
+    }
+
+    pub fn segmentify(self, len: f64) -> Self {
+        // convert boundary to segments, cloning marks as appropriate
+        // len is maximum segment length of subdivided curve
+
+        let mut res_edges = Vec::new();
+        let mut res_marks = Vec::new();
+
+        for (e, m) in self.edges_and_marks() {
+            let edge_segments = e.into_segments(len);
+
+            for _ in 0..edge_segments.len() {
+                res_marks.push(m.clone());
+            }
+
+            res_edges.extend(edge_segments);
+        }
+
+        Self::from_edges_and_marks(res_edges, res_marks)
     }
 }
 
@@ -201,6 +232,15 @@ impl MarkedModel {
     pub fn bounding_box(&self) -> (Point, Point) {
         // currently relies on the outer bound coming first (see below From<PartModel>)
         self.0[0].bound.bounding_box()
+    }
+
+    pub fn segmentify(&mut self, len: f64) {
+        // convert boundaries to segments, cloning marks as appropriate
+        // len is maximum segment length of subdivided curve
+
+        for b in self.0.iter_mut() {
+            *b = b.clone().segmentify(len); // boo clone
+        }
     }
 }
 

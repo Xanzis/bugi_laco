@@ -1,5 +1,6 @@
 mod app;
 mod reader;
+mod writer;
 
 use iced::{Sandbox, Settings};
 

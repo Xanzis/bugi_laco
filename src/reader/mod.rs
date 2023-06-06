@@ -74,7 +74,13 @@ impl PartModel {
             }
         }
 
-        let enclosing = bounds.swap_remove(enclosing.expect("no enclosing boundary"));
+        let mut enclosing = bounds.swap_remove(enclosing.expect("no enclosing boundary"));
+
+        // store outer bound in positive orientation and inner bounds in negative orientation
+        enclosing.orient_positive();
+        for b in bounds.iter_mut() {
+            b.orient_negative();
+        }
 
         // TODO: handle improper models where a boundary is enclosed by more than one (nested)
         // TODO: check that no boundaries intersect

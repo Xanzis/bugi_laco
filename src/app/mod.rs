@@ -1,10 +1,11 @@
-mod mark;
+pub mod mark;
 mod plot;
 
 use iced::widget::{button, column, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox, Settings};
 
 use crate::reader::PartModel;
+use crate::writer::Writer;
 use mark::{Annotation, Mark, MarkedModel};
 
 #[derive(Default)]
@@ -27,6 +28,8 @@ pub enum Message {
     ForceChanged(String),
     SetConstraint,
     SetForce,
+    Write,
+    Segmentify,
     Nop,
 }
 
@@ -110,6 +113,25 @@ impl Sandbox for LacoApp {
 
                 self.canvas_state.request_redraw();
             }
+            Message::Write => {
+                let mut writer = Writer::new();
+
+                self.model.as_ref().map(|m| {
+                    for b in m.bounds().cloned() {
+                        writer.add_boundary(b);
+                    }
+                });
+
+                writer.write("out.bbnd");
+            }
+            Message::Segmentify => {
+                self.model.as_mut().map(|m| {
+                    // TODO user-specified precision
+                    m.segmentify(2.0);
+                });
+
+                self.canvas_state.request_redraw();
+            }
             Message::Nop => (),
         }
     }
@@ -146,6 +168,10 @@ impl Sandbox for LacoApp {
                 .on_press(Message::SetConstraint),
             text_input("force value", &self.force_text, Message::ForceChanged).padding(8),
             button("Set Force").padding(15).on_press(Message::SetForce),
+            button("Write").padding(15).on_press(Message::Write),
+            button("Segmentify")
+                .padding(15)
+                .on_press(Message::Segmentify),
         ]
         .padding(20)
         .spacing(20)
