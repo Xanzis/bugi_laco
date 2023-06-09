@@ -196,11 +196,14 @@ fn draw_bound(bound: &MarkedBound, transform: &Transform, frame: &mut Frame) {
 fn build_edge(builder: &mut Builder, edge: &Edge, transform: &Transform) {
     match *edge {
         Edge::Arc(a) => {
+            // use unbounded direction-corrected angles
+            let (p_ang, q_ang) = a.pq_ang_unbounded();
+
             let arc = Arc {
                 center: transform.forward(a.center()),
                 radius: transform.apply_scale(a.radius()) as f32,
-                start_angle: (-1.0 * a.p_ang()) as f32,
-                end_angle: (-1.0 * a.q_ang()) as f32,
+                start_angle: (-1.0 * p_ang) as f32,
+                end_angle: (-1.0 * q_ang) as f32,
             };
             builder.arc(arc);
         }
