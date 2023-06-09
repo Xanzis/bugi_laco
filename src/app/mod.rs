@@ -177,40 +177,33 @@ impl Sandbox for LacoApp {
         .width(Length::FillPortion(3));
 
         let load_field = row![
-            text_input(
-                "source file path",
-                &self.source_text,
-                Message::SourceChanged
-            )
-            .padding(8),
+            text_input("source file path", &self.source_text)
+                .on_input(Message::SourceChanged)
+                .padding(8),
             button("Load").padding(8).on_press(Message::LoadModel)
         ]
         .spacing(10);
 
         let constraint_field = row![
-            text_input(
-                "constraint value",
-                &self.constraint_text,
-                Message::ConstraintChanged
-            )
-            .padding(8),
+            text_input("constraint value", &self.constraint_text)
+                .on_input(Message::ConstraintChanged)
+                .padding(8),
             button("Set").padding(8).on_press(Message::SetConstraint)
         ]
         .spacing(10);
 
         let force_field = row![
-            text_input("force value", &self.force_text, Message::ForceChanged).padding(8),
+            text_input("force value", &self.force_text)
+                .on_input(Message::ForceChanged)
+                .padding(8),
             button("Set").padding(8).on_press(Message::SetForce)
         ]
         .spacing(10);
 
         let segment_field = row![
-            text_input(
-                "arc segmentation length",
-                &self.size_text,
-                Message::SizeChanged
-            )
-            .padding(8),
+            text_input("arc segmentation length", &self.size_text)
+                .on_input(Message::SizeChanged)
+                .padding(8),
             button("Segmentify")
                 .padding(8)
                 .on_press(Message::Segmentify)
