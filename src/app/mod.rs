@@ -15,12 +15,15 @@ pub struct LacoApp {
     log: String,
 
     // contents of text input boxes
+    source_text: String,
     constraint_text: String,
     force_text: String,
+    size_text: String,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    SourceChanged(String),
     LoadModel,
     Clear,
     Plot(plot::PlotMessage),
@@ -29,6 +32,7 @@ pub enum Message {
     SetConstraint,
     SetForce,
     Write,
+    SizeChanged(String),
     Segmentify,
     Nop,
 }
@@ -46,9 +50,14 @@ impl Sandbox for LacoApp {
 
     fn update(&mut self, message: Self::Message) {
         match message {
+            Message::SourceChanged(s) => {
+                self.source_text = s;
+            }
             Message::LoadModel => {
-                self.model = Some(PartModel::load_dxf().into());
+                self.model = Some(PartModel::load_dxf(&self.source_text).into());
                 self.canvas_state.request_redraw();
+
+                self.source_text.clear();
 
                 self.log.push_str("loaded model\n"); // capture stderr from load?
             }
@@ -93,6 +102,8 @@ impl Sandbox for LacoApp {
                     }
                 });
 
+                self.constraint_text.clear();
+
                 self.canvas_state.request_redraw();
             }
             Message::SetForce => {
@@ -111,6 +122,8 @@ impl Sandbox for LacoApp {
                     }
                 });
 
+                self.force_text.clear();
+
                 self.canvas_state.request_redraw();
             }
             Message::Write => {
@@ -124,11 +137,22 @@ impl Sandbox for LacoApp {
 
                 writer.write("out.bbnd");
             }
+            Message::SizeChanged(s) => {
+                self.size_text = s;
+            }
             Message::Segmentify => {
-                self.model.as_mut().map(|m| {
-                    // TODO user-specified precision
-                    m.segmentify(2.0);
-                });
+                if let Ok(s) = self.size_text.parse() {
+                    self.model.as_mut().map(|m| {
+                        // TODO user-specified precision
+                        m.segmentify(s);
+                    });
+
+                    self.log.push_str(&format!("segmented with size {}\n", s));
+                } else {
+                    self.log.push_str("ill-formed segmentation size\n");
+                }
+
+                self.size_text.clear();
 
                 self.canvas_state.request_redraw();
             }
@@ -152,36 +176,64 @@ impl Sandbox for LacoApp {
         .align_items(Alignment::Center)
         .width(Length::FillPortion(3));
 
-        let control_pane = column![
-            button("Load Model")
-                .padding(15)
-                .on_press(Message::LoadModel),
-            button("Clear").padding(8).on_press(Message::Clear),
+        let load_field = row![
+            text_input(
+                "source file path",
+                &self.source_text,
+                Message::SourceChanged
+            )
+            .padding(8),
+            button("Load").padding(8).on_press(Message::LoadModel)
+        ]
+        .spacing(10);
+
+        let constraint_field = row![
             text_input(
                 "constraint value",
                 &self.constraint_text,
                 Message::ConstraintChanged
             )
             .padding(8),
-            button("Set Constraint")
-                .padding(15)
-                .on_press(Message::SetConstraint),
+            button("Set").padding(8).on_press(Message::SetConstraint)
+        ]
+        .spacing(10);
+
+        let force_field = row![
             text_input("force value", &self.force_text, Message::ForceChanged).padding(8),
-            button("Set Force").padding(15).on_press(Message::SetForce),
-            button("Write").padding(15).on_press(Message::Write),
+            button("Set").padding(8).on_press(Message::SetForce)
+        ]
+        .spacing(10);
+
+        let segment_field = row![
+            text_input(
+                "arc segmentation length",
+                &self.size_text,
+                Message::SizeChanged
+            )
+            .padding(8),
             button("Segmentify")
-                .padding(15)
-                .on_press(Message::Segmentify),
+                .padding(8)
+                .on_press(Message::Segmentify)
+        ]
+        .spacing(10);
+
+        let control_pane = column![
+            load_field,
+            button("Clear").padding(8).on_press(Message::Clear),
+            constraint_field,
+            force_field,
+            button("Write").padding(8).on_press(Message::Write),
+            segment_field,
         ]
         .padding(20)
         .spacing(20)
-        .align_items(Alignment::Center)
+        .align_items(Alignment::Start)
         .width(Length::FillPortion(2));
 
         row![view_pane, control_pane]
             .padding(20)
             .spacing(20)
-            .align_items(Alignment::Center)
+            .align_items(Alignment::Start)
             .into()
     }
 }

@@ -4,7 +4,9 @@ use handle::{EdgeHandle, PointStore};
 
 use spacemath::two::boundary::Boundary;
 use spacemath::two::Point;
+
 use std::collections::{BTreeSet, HashMap};
+use std::path::Path;
 
 #[derive(Clone, Debug)]
 pub struct PartModel {
@@ -13,8 +15,8 @@ pub struct PartModel {
 }
 
 impl PartModel {
-    pub fn load_dxf() -> Self {
-        let input = dxf::Drawing::load_file("example_files/test.DXF").unwrap();
+    pub fn load_dxf<T: AsRef<Path>>(source: T) -> Self {
+        let input = dxf::Drawing::load_file(source).unwrap();
 
         let mut store = PointStore::new();
         let mut edges = Vec::new();
