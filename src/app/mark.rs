@@ -11,12 +11,6 @@ pub struct Mark {
 }
 
 impl Mark {
-    pub fn clicked() -> Self {
-        let mut res = Self::default();
-        res.inter = Interaction::Clicked;
-        res
-    }
-
     pub fn click(&mut self) {
         self.inter = Interaction::Clicked;
     }
@@ -41,10 +35,6 @@ impl Mark {
             Annotation::Constraint(_, _) => true,
             _ => false,
         }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.annot == Annotation::Empty && self.inter == Interaction::Ignored
     }
 }
 
@@ -99,7 +89,6 @@ impl Annotation {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Interaction {
     Ignored,
-    Hovered,
     Clicked,
 }
 

@@ -4,7 +4,7 @@ use std::path::Path;
 
 use spacemath::two::Point;
 
-use crate::app::mark::{Annotation, Mark, MarkedBound};
+use crate::app::mark::{Annotation, MarkedBound};
 
 pub struct Writer {
     points: Vec<Vec<(String, Option<String>)>>,

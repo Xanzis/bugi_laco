@@ -2,11 +2,11 @@ pub mod mark;
 mod plot;
 
 use iced::widget::{button, column, row, scrollable, text, text_input};
-use iced::{Alignment, Element, Length, Sandbox, Settings};
+use iced::{Alignment, Element, Length, Sandbox};
 
 use crate::reader::PartModel;
 use crate::writer::Writer;
-use mark::{Annotation, Mark, MarkedModel};
+use mark::{Annotation, MarkedModel};
 
 #[derive(Default)]
 pub struct LacoApp {
@@ -34,7 +34,6 @@ pub enum Message {
     Write,
     SizeChanged(String),
     Segmentify,
-    Nop,
 }
 
 impl Sandbox for LacoApp {
@@ -156,7 +155,6 @@ impl Sandbox for LacoApp {
 
                 self.canvas_state.request_redraw();
             }
-            Message::Nop => (),
         }
     }
 

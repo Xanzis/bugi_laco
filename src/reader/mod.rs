@@ -3,9 +3,7 @@ mod handle;
 use handle::{EdgeHandle, PointStore};
 
 use spacemath::two::boundary::Boundary;
-use spacemath::two::Point;
 
-use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 
 #[derive(Clone, Debug)]

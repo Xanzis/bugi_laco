@@ -5,10 +5,9 @@ use iced::Color;
 use iced::{keyboard, mouse};
 use iced::{Element, Length, Rectangle, Theme};
 
-use spacemath::two::boundary::{Boundary, Edge};
+use spacemath::two::boundary::Edge;
 
 use super::mark::{MarkedBound, MarkedModel};
-use crate::reader::PartModel;
 
 #[derive(Default)]
 pub struct CanvasState {
@@ -207,7 +206,7 @@ fn build_edge(builder: &mut Builder, edge: &Edge, transform: &Transform) {
             };
             builder.arc(arc);
         }
-        Edge::Segment(s) => {
+        Edge::Segment(_) => {
             builder.move_to(transform.forward(edge.p()));
             builder.line_to(transform.forward(edge.q()));
         }
