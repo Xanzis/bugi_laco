@@ -10,6 +10,9 @@ pub struct Writer {
     points: Vec<Vec<(String, Option<String>)>>,
     constraints: Vec<((String, String), (bool, bool))>,
     forces: Vec<((String, String), (f64, f64))>,
+
+    // for unit conversions (bbnd is meters)
+    scale: f64,
 }
 
 impl Writer {
@@ -18,6 +21,15 @@ impl Writer {
             points: Vec::new(),
             constraints: Vec::new(),
             forces: Vec::new(),
+
+            scale: 1.0,
+        }
+    }
+
+    pub fn scale(self, scale: f64) -> Self {
+        Self {
+            scale,
+            ..self
         }
     }
 
@@ -27,7 +39,7 @@ impl Writer {
         let mut points: Vec<(String, Option<String>)> = bound
             .points()
             .into_iter()
-            .map(|p| (format_point(p), None))
+            .map(|p| (format_point(p * self.scale), None))
             .collect();
 
         // gross
@@ -71,7 +83,7 @@ impl Writer {
         self.points.push(points);
     }
 
-    pub fn write<T: AsRef<Path>>(self, path: T) {
+    pub fn write<T: AsRef<Path>>(self, path: T, material: &str, thickness: f64) {
         let mut to_write = String::new();
 
         // write all the polygons
@@ -93,8 +105,8 @@ impl Writer {
         }
 
         // fill in proper material selection logic (with user input somewhere)
-        to_write.push_str("thickness 0.1\n");
-        to_write.push_str("material AL6061\n");
+        to_write.push_str(&format!("thickness {}\n", thickness));
+        to_write.push_str(&format!("material {}\n", material));
 
         // write all the constraints
         for ((p_label, q_label), c) in self.constraints {

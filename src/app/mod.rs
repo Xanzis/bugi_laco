@@ -1,7 +1,7 @@
 pub mod mark;
 mod plot;
 
-use iced::widget::{button, column, row, scrollable, text, text_input};
+use iced::widget::{button, column, row, scrollable, text, text_input, pick_list};
 use iced::{Alignment, Element, Length, Sandbox};
 
 use crate::reader::PartModel;
@@ -14,17 +14,22 @@ pub struct LacoApp {
     canvas_state: plot::CanvasState,
     log: String,
 
+    selected_unit: Option<Unit>,
+
     // contents of text input boxes
     source_text: String,
     constraint_text: String,
     force_text: String,
     size_text: String,
+    material_text: String,
+    thickness_text: String,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
     SourceChanged(String),
     LoadModel,
+    UnitSelected(Unit),
     Clear,
     Plot(plot::PlotMessage),
     ConstraintChanged(String),
@@ -34,6 +39,8 @@ pub enum Message {
     Write,
     SizeChanged(String),
     Segmentify,
+    MaterialChanged(String),
+    ThicknessChanged(String),
 }
 
 impl Sandbox for LacoApp {
@@ -59,6 +66,9 @@ impl Sandbox for LacoApp {
                 self.source_text.clear();
 
                 self.log.push_str("loaded model\n"); // capture stderr from load?
+            }
+            Message::UnitSelected(u) => {
+                self.selected_unit = Some(u);
             }
             Message::Clear => {
                 self.model = None;
@@ -126,7 +136,10 @@ impl Sandbox for LacoApp {
                 self.canvas_state.request_redraw();
             }
             Message::Write => {
-                let mut writer = Writer::new();
+                // TODO: set scale with a units radio button
+                let scale = self.selected_unit.map(|u| u.scale()).unwrap_or(1.0);
+
+                let mut writer = Writer::new().scale(scale);
 
                 self.model.as_ref().map(|m| {
                     for b in m.bounds().cloned() {
@@ -134,7 +147,13 @@ impl Sandbox for LacoApp {
                     }
                 });
 
-                writer.write("out.bbnd");
+                if let Ok(thickness) = self.thickness_text.parse::<f64>() {
+                    let thickness = thickness * scale;
+                    writer.write("out.bbnd", &self.material_text, thickness);
+                }
+
+                self.material_text.clear();
+                self.thickness_text.clear();
             }
             Message::SizeChanged(s) => {
                 self.size_text = s;
@@ -154,6 +173,12 @@ impl Sandbox for LacoApp {
                 self.size_text.clear();
 
                 self.canvas_state.request_redraw();
+            }
+            Message::MaterialChanged(m) => {
+                self.material_text = m;
+            }
+            Message::ThicknessChanged(t) => {
+                self.thickness_text = t;
             }
         }
     }
@@ -208,13 +233,30 @@ impl Sandbox for LacoApp {
         ]
         .spacing(10);
 
+        let write_field = row![
+            text_input("material", &self.material_text)
+                .on_input(Message::MaterialChanged)
+                .padding(8),
+            text_input("thickness", &self.thickness_text)
+                .on_input(Message::ThicknessChanged)
+                .padding(8),
+            button("Write").padding(8).on_press(Message::Write)
+        ]
+        .spacing(10);
+
+        let misc_field = row![
+            button("Clear").padding(8).on_press(Message::Clear),
+            pick_list(&Unit::ALL[..], self.selected_unit, Message::UnitSelected).placeholder("unit")
+        ]
+        .spacing(10);
+
         let control_pane = column![
             load_field,
-            button("Clear").padding(8).on_press(Message::Clear),
+            misc_field,
             constraint_field,
             force_field,
-            button("Write").padding(8).on_press(Message::Write),
             segment_field,
+            write_field,
         ]
         .padding(20)
         .spacing(20)
@@ -226,5 +268,44 @@ impl Sandbox for LacoApp {
             .spacing(20)
             .align_items(Alignment::Start)
             .into()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Unit {
+    #[default]
+    Meter,
+    Millimeter,
+    Inch,
+}
+
+impl Unit {
+    const ALL: [Unit; 3] = [
+        Unit::Meter,
+        Unit::Millimeter,
+        Unit::Inch,
+    ];
+
+    fn scale(self) -> f64 {
+        // the scale by which to multiply a value in these units to obtain a value in meters
+        match self {
+            Unit::Meter => 1.0,
+            Unit::Inch => 2.54 / 100.0,
+            Unit::Millimeter => 1.0 / 1000.0,
+        }
+    }
+}
+
+impl std::fmt::Display for Unit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Unit::Meter => "m",
+                Unit::Millimeter => "mm",
+                Unit::Inch => "in",
+            }
+        )
     }
 }
