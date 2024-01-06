@@ -49,6 +49,7 @@ struct PlotState {
 pub enum PlotMessage {
     Redraw,
     Select(spacemath::two::Point),
+    Deselect,
 }
 
 impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
@@ -135,6 +136,10 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
                             (event::Status::Captured, None)
                         }
                     }
+                    keyboard::Event::KeyPressed {
+                        key_code: keyboard::KeyCode::Escape,
+                        ..
+                    } => (event::Status::Captured, Some(PlotMessage::Deselect)),
                     _ => (event::Status::Ignored, None),
                 }
                 // other key entries could send messages up to the top level app

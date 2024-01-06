@@ -27,10 +27,7 @@ impl Writer {
     }
 
     pub fn scale(self, scale: f64) -> Self {
-        Self {
-            scale,
-            ..self
-        }
+        Self { scale, ..self }
     }
 
     pub fn add_boundary(&mut self, marked_bound: MarkedBound) {

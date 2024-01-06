@@ -1,7 +1,7 @@
 pub mod mark;
 mod plot;
 
-use iced::widget::{button, column, row, scrollable, text, text_input, pick_list};
+use iced::widget::{button, column, pick_list, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length, Sandbox};
 
 use crate::reader::PartModel;
@@ -85,6 +85,13 @@ impl Sandbox for LacoApp {
                         let (edge, mark) = m.click_at_pos(p);
                         self.log
                             .push_str(&format!("selected {:?} with annotation {:?}\n", edge, mark));
+                    });
+                    self.canvas_state.request_redraw();
+                }
+                plot::PlotMessage::Deselect => {
+                    self.model.as_mut().map(|m| {
+                        m.clear_interactions();
+                        self.log.push_str("cleared selection");
                     });
                     self.canvas_state.request_redraw();
                 }
@@ -246,7 +253,8 @@ impl Sandbox for LacoApp {
 
         let misc_field = row![
             button("Clear").padding(8).on_press(Message::Clear),
-            pick_list(&Unit::ALL[..], self.selected_unit, Message::UnitSelected).placeholder("unit")
+            pick_list(&Unit::ALL[..], self.selected_unit, Message::UnitSelected)
+                .placeholder("unit")
         ]
         .spacing(10);
 
@@ -280,11 +288,7 @@ pub enum Unit {
 }
 
 impl Unit {
-    const ALL: [Unit; 3] = [
-        Unit::Meter,
-        Unit::Millimeter,
-        Unit::Inch,
-    ];
+    const ALL: [Unit; 3] = [Unit::Meter, Unit::Millimeter, Unit::Inch];
 
     fn scale(self) -> f64 {
         // the scale by which to multiply a value in these units to obtain a value in meters
