@@ -1,9 +1,9 @@
 use iced::widget::canvas::event::{self, Event};
 use iced::widget::canvas::path::{Arc, Builder};
-use iced::widget::canvas::{self, Canvas, Cursor, Frame, Geometry, Path, Stroke};
+use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke};
 use iced::Color;
 use iced::{keyboard, mouse};
-use iced::{Element, Length, Rectangle, Theme};
+use iced::{Element, Length, Rectangle, Renderer, Theme};
 
 use spacemath::two::boundary::Edge;
 
@@ -58,14 +58,15 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
     fn draw(
         &self,
         state: &Self::State,
+        renderer: &Renderer,
         _theme: &Theme,
         bounds: Rectangle,
-        _cursor: Cursor,
+        _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
         let content = self
             .canvas_state
             .cache
-            .draw(bounds.size(), |frame: &mut Frame| {
+            .draw(renderer, bounds.size(), |frame: &mut Frame| {
                 self.model.map(|m| draw_model(m, &state.transform, frame));
                 frame.stroke(
                     &Path::rectangle(iced::Point::ORIGIN, frame.size()),
@@ -81,9 +82,9 @@ impl<'a> canvas::Program<PlotMessage> for Plot<'a> {
         state: &mut Self::State,
         event: Event,
         bounds: Rectangle,
-        cursor: Cursor,
+        cursor: mouse::Cursor,
     ) -> (event::Status, Option<PlotMessage>) {
-        let cursor_position = if let Some(position) = cursor.position_in(&bounds) {
+        let cursor_position = if let Some(position) = cursor.position_in(bounds) {
             position
         } else {
             return (event::Status::Ignored, None);

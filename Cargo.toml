@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 dxf = "0.5.0"
-iced = {version = "0.9", features = ["canvas"]}
+iced = {version = "0.10", features = ["canvas"]}
 spacemath = { path = "../spacemath", version = "0.1.0" }
