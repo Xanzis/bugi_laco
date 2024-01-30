@@ -18,7 +18,6 @@ pub struct LacoApp {
 
     // contents of text input boxes
     source_text: String,
-    constraint_text: String,
     force_text: String,
     size_text: String,
     material_text: String,
@@ -32,9 +31,11 @@ pub enum Message {
     UnitSelected(Unit),
     Clear,
     Plot(plot::PlotMessage),
-    ConstraintChanged(String),
+    ConstrainX,
+    ConstrainY,
+    ConstrainXY,
+    ConstrainTangent,
     ForceChanged(String),
-    SetConstraint,
     SetForce,
     Write,
     SizeChanged(String),
@@ -96,31 +97,60 @@ impl Sandbox for LacoApp {
                     self.canvas_state.request_redraw();
                 }
             },
-            Message::ConstraintChanged(c) => {
-                self.constraint_text = c;
-            }
-            Message::ForceChanged(f) => {
-                self.force_text = f;
-            }
-            Message::SetConstraint => {
+            Message::ConstrainX => {
                 self.model.as_mut().map(|m| {
-                    if let Some(annot) = Annotation::parse_constraint(&self.constraint_text) {
-                        let marked = m.annotate_clicked(annot);
+                    let marked = m.annotate_clicked(Annotation::ConstrainX);
+                    m.clear_interactions();
 
-                        m.clear_interactions();
-
-                        for (edge, mark) in marked {
-                            self.log
-                                .push_str(&format!("annotated {:?} with {:?}\n", edge, mark));
-                        }
-                    } else {
-                        self.log.push_str("ill-formed constraint text\n");
+                    for (edge, mark) in marked {
+                        self.log
+                            .push_str(&format!("annotated {:?} with {:?}\n", edge, mark));
                     }
                 });
 
-                self.constraint_text.clear();
+                self.canvas_state.request_redraw();
+            }
+            Message::ConstrainY => {
+                self.model.as_mut().map(|m| {
+                    let marked = m.annotate_clicked(Annotation::ConstrainY);
+                    m.clear_interactions();
+
+                    for (edge, mark) in marked {
+                        self.log
+                            .push_str(&format!("annotated {:?} with {:?}\n", edge, mark));
+                    }
+                });
 
                 self.canvas_state.request_redraw();
+            }
+            Message::ConstrainXY => {
+                self.model.as_mut().map(|m| {
+                    let marked = m.annotate_clicked(Annotation::ConstrainXY);
+                    m.clear_interactions();
+
+                    for (edge, mark) in marked {
+                        self.log
+                            .push_str(&format!("annotated {:?} with {:?}\n", edge, mark));
+                    }
+                });
+
+                self.canvas_state.request_redraw();
+            }
+            Message::ConstrainTangent => {
+                self.model.as_mut().map(|m| {
+                    let marked = m.annotate_clicked(Annotation::ConstrainTangent);
+                    m.clear_interactions();
+
+                    for (edge, mark) in marked {
+                        self.log
+                            .push_str(&format!("annotated {:?} with {:?}\n", edge, mark));
+                    }
+                });
+
+                self.canvas_state.request_redraw();
+            }
+            Message::ForceChanged(f) => {
+                self.force_text = f;
             }
             Message::SetForce => {
                 self.model.as_mut().map(|m| {
@@ -215,10 +245,13 @@ impl Sandbox for LacoApp {
         .spacing(10);
 
         let constraint_field = row![
-            text_input("constraint value", &self.constraint_text)
-                .on_input(Message::ConstraintChanged)
-                .padding(8),
-            button("Set").padding(8).on_press(Message::SetConstraint)
+            text("Constrain: "),
+            button("X").padding(8).on_press(Message::ConstrainX),
+            button("Y").padding(8).on_press(Message::ConstrainY),
+            button("XY").padding(8).on_press(Message::ConstrainXY),
+            button("Tangent")
+                .padding(8)
+                .on_press(Message::ConstrainTangent),
         ]
         .spacing(10);
 

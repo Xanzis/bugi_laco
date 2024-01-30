@@ -8,7 +8,7 @@ use crate::app::mark::{Annotation, MarkedBound};
 
 pub struct Writer {
     points: Vec<Vec<(String, Option<String>)>>,
-    constraints: Vec<((String, String), (bool, bool))>,
+    constraints: Vec<((String, String), String)>,
     forces: Vec<((String, String), (f64, f64))>,
 
     // for unit conversions (bbnd is meters)
@@ -33,10 +33,11 @@ impl Writer {
     pub fn add_boundary(&mut self, marked_bound: MarkedBound) {
         let (bound, marks) = marked_bound.into_parts();
 
-        let mut points: Vec<(String, Option<String>)> = bound
-            .points()
-            .into_iter()
-            .map(|p| (format_point(p * self.scale), None))
+        let points_raw = bound.points().into_iter().collect::<Vec<Point>>();
+
+        let mut points: Vec<(String, Option<String>)> = points_raw
+            .iter()
+            .map(|&p| (format_point(p * self.scale), None))
             .collect();
 
         // gross
@@ -69,7 +70,13 @@ impl Writer {
                 points[vs.1].1 = Some(q_label.clone());
 
                 let c = match mark.annot {
-                    Annotation::Constraint(x, y) => (x, y),
+                    Annotation::ConstrainX => "x".to_string(),
+                    Annotation::ConstrainY => "y".to_string(),
+                    Annotation::ConstrainXY => "xy".to_string(),
+                    Annotation::ConstrainTangent => {
+                        let ang = (points_raw[vs.0] - points_raw[vs.1]).perp().ang();
+                        format!("angle:{:3.5}", ang)
+                    }
                     _ => unreachable!(),
                 };
 
@@ -102,17 +109,12 @@ impl Writer {
         }
 
         // fill in proper material selection logic (with user input somewhere)
-        to_write.push_str(&format!("thickness {}\n", thickness));
+        to_write.push_str(&format!("condition planestress {}\n", thickness));
         to_write.push_str(&format!("material {}\n", material));
 
         // write all the constraints
         for ((p_label, q_label), c) in self.constraints {
-            let c = format!(
-                "distributed_constraint {} {} {}\n",
-                p_label,
-                q_label,
-                format_constraint(c)
-            );
+            let c = format!("distributed_constraint {} {} {}\n", p_label, q_label, c);
             to_write.push_str(&c);
         }
 
@@ -139,20 +141,4 @@ fn point_label(p_str: &str) -> String {
 
 fn format_point(p: Point) -> String {
     format!("{:.5} {:.5}", p.x, p.y)
-}
-
-fn format_constraint(c: (bool, bool)) -> String {
-    // allocating but whatever
-
-    let mut res = String::new();
-
-    if c.0 {
-        res.push('x');
-    }
-
-    if c.1 {
-        res.push('y');
-    }
-
-    return res;
 }

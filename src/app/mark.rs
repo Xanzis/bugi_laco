@@ -32,7 +32,10 @@ impl Mark {
 
     pub fn is_constraint(&self) -> bool {
         match self.annot {
-            Annotation::Constraint(_, _) => true,
+            Annotation::ConstrainX => true,
+            Annotation::ConstrainY => true,
+            Annotation::ConstrainXY => true,
+            Annotation::ConstrainTangent => true,
             _ => false,
         }
     }
@@ -50,21 +53,14 @@ impl Default for Mark {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Annotation {
     Empty,
-    Constraint(bool, bool),
+    ConstrainX,
+    ConstrainY,
+    ConstrainXY,
+    ConstrainTangent,
     Force(f64, f64),
 }
 
 impl Annotation {
-    pub fn parse_constraint(x: &str) -> Option<Self> {
-        // expect x", "y", or "xy"
-        match x {
-            "x" => Some(Self::Constraint(true, false)),
-            "y" => Some(Self::Constraint(false, true)),
-            "xy" => Some(Self::Constraint(true, true)),
-            _ => None,
-        }
-    }
-
     pub fn parse_force(x: &str) -> Option<Self> {
         // expect (0.05, 1.205)
         // do this with nom when I have internet
